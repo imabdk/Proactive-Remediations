@@ -12,7 +12,7 @@
     Twitter: @mwbengtsson
 
 .LINK
-    
+    https://www.imab.dk/inventory-lenovo-bios-password-states-using-powershell-and-proactive-remediations
 #> 
 #region Functions
 # Get-ComputerModel function. Used for determining if a Lenovo device or not
@@ -42,9 +42,9 @@ function Get-BiosPasswordState() {
 }
 #endregion
 
-#Region Execution
+#region Execution
 # Accepted password states, translating into that a BIOS password is configured
-#If password state is not equal to any of these, this means a BIOS password is not configured
+# If password state is not equal to any of these, this means a BIOS password is not configured
 $global:approvedConfigs = "2","3","6","7"
 try {
     $isLenovo = Get-ComputerModel
