@@ -16,7 +16,6 @@
 
 .LINK
     https://www.imab.dk/getting-windows-11-cis-compliant-configuring-windows-firewall-logging-using-powershell-and-microsoft-intune
-    
 #> 
 
 function Get-WindowsFirewallLogging() {
