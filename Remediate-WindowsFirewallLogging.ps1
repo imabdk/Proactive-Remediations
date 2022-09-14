@@ -8,7 +8,7 @@
     Same as above
 
 .NOTES
-    Filename: Detect-WindowsFirewallLogFiles.ps1
+    Filename: Remediate-WindowsFirewallLogging.ps1
     Version: 1.0
     Author: Martin Bengtsson
     Blog: www.imab.dk
