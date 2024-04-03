@@ -51,7 +51,7 @@ begin {
 process {
     if ((Get-NetBiosState)[0] -ne 2) {
         try {
-            Get-CimInstance -ClassName 'Win32_NetworkAdapterConfiguration' -Filter "Description = '$activeNetwork'" | Invoke-CimMethod -MethodName SetTcpipNetbios -Arguments @{ TcpipNetbiosOptions = 2 } | Out-Null
+            Get-CimInstance -ClassName 'Win32_NetworkAdapterConfiguration' -Filter "Description = '$(Get-ActiveNetworkCard)'" | Invoke-CimMethod -MethodName SetTcpipNetbios -Arguments @{ TcpipNetbiosOptions = 2 } | Out-Null
             Write-Output "[Success] NetBios is now disabled, and is currently configured to: $(Get-NetBiosState)"
             exit 0
         } catch {
