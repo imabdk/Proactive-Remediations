@@ -15,7 +15,7 @@
     Twitter: @mwbengtsson
 
 .LINK
-    
+    https://www.imab.dk/configure-allow-logon-locally-automatically-using-powershell-and-microsoft-intune/    
 #> 
 [CmdletBinding()]
 param (
@@ -100,7 +100,7 @@ process {
     $global:remediationSuccess = @()
     $loggedonUserSID = @()
     $loggedOnUsers = Get-LoggedOnUsers
-    $trustedGroup = Get-AccountSID -commonName "KM\Client Computer Admins"
+    $trustedGroup = Get-AccountSID -commonName "YourDomain\Trusted Group"
     if (-NOT[string]::IsNullOrEmpty($loggedOnUsers)) {
         if ($runDetection -eq $true) {
             $currentConfig = Get-SeInterActiveLogonRightConfig
