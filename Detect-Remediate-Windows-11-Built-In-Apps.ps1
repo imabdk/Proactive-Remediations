@@ -1,33 +1,28 @@
 <#
 .SYNOPSIS
-    Detects and removes built-in apps in Windows 11.
+This script is used to detect and remediate built-in apps in Windows 11.
 
 .DESCRIPTION
-    This script detects and removes built-in apps in Windows 11. It can be used as a detection and remediation script in Microsoft Intune.
+The script provides two main functionalities: detection and remediation of built-in apps. By default, the script runs in detection mode, but it can also be configured to perform remediation.
+The list of built-in apps to be detected and remediated can be customized by modifying the $appxPackageList array in the script.
 
 .NOTES
-    Filename: Detect-Remediate-Windows-11-Built-In-Apps.ps1
-    Version: 1.0
-    Author: Martin Bengtsson
-    Blog: www.imab.dk
-    Twitter: @mwbengtsson
-
+    File Name      : Detect-Remediate-Windows-11-Built-In-Apps.ps1
+    Author         : Martin Bengtsson
+    Blog           : https://www.imab.dk
 #>
-[CmdletBinding()]
+
 param (
-    [parameter(Mandatory=$false)]
-    [ValidateNotNullOrEmpty()]
     [bool]$runDetection = $true,
-    [parameter(Mandatory=$false)]
-    [ValidateNotNullOrEmpty()]
     [bool]$runRemediation = $true
 )
+
 begin {
     $appxPackageList = @(
         "MicrosoftCorporationII.QuickAssist"
         "MicrosoftTeams"
     )
-    function Test-InstalledAppxPackages {
+    function Test-InstalledAppxPackages() {
         foreach ($app in $appxPackageList) {
             try {
                 $isAppInstalled = Get-AppxPackage -Name $app -ErrorAction SilentlyContinue
@@ -57,6 +52,7 @@ begin {
         exit 1
     }
 }
+
 process {
     $global:needsRemediation = @()
     $global:remediationSuccess = @()
@@ -72,6 +68,7 @@ process {
         }
     }
 }
+
 end {
     if ($runDetection -eq $true) {
         if ($global:needsRemediation -contains $true -AND $global:remediationSuccess -notcontains $true) {
@@ -79,7 +76,7 @@ end {
             exit 1
         }
         elseif ($global:remediationSuccess -contains $true -AND $global:remediationSuccess -notcontains $false) {
-            Write-Output "[OK] Remediation was run successfully. Built-in apps was removed."
+            Write-Output "[OK] Remediation was run successfully. Built-in apps were removed."
             exit 0
         }
         else {
