@@ -1,10 +1,10 @@
 <#
 .SYNOPSIS
-This script is used to detect and remediate built-in apps in Windows 11.
+    This script is used to detect and remediate built-in apps in Windows 11.
 
 .DESCRIPTION
-The script provides two main functionalities: detection and remediation of built-in apps. By default, the script runs in detection mode, but it can also be configured to perform remediation.
-The list of built-in apps to be detected and remediated can be customized by modifying the $appxPackageList array in the script.
+    The script provides two main functionalities: detection and remediation of built-in apps. By default, the script runs in detection mode, but it can also be configured to perform remediation.
+    The list of built-in apps to be detected and remediated can be customized by modifying the $appxPackageList array in the script.
 
 .NOTES
     File Name      : Detect-Remediate-Windows-11-Built-In-Apps.ps1
