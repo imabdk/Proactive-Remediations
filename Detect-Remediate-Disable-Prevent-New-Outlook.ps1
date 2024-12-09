@@ -76,10 +76,17 @@ begin {
             [Parameter(Mandatory=$true)]
             [string]$registryPath,
             [Parameter(Mandatory=$true)]
-            [string]$registryName
+            [string]$registryName,
+            [Parameter(Mandatory=$false)]
+            [string]$registryType
         )
         if (-NOT(Test-RegistryKeyValue -registryPath $registryPath -registryName $registryName)) {
             return $null
+        }
+        if ($registryType -eq "Binary") {
+            $value = [string]::join(' ',((Get-ItemProperty -Path $registryPath -Name $registryName).$registryName|ForEach-Object{'{0:x2}' -f $_}))
+            $value = $value.Replace(' ',',')
+            return $value
         }
         $registryProperties = Get-ItemProperty -Path $registryPath -Name *
         $value = $registryProperties.$registryName
@@ -94,8 +101,8 @@ begin {
             [string]$registryName
         )
         if (Test-RegistryKeyValue -registryPath $registryPath -registryName $registryName) {
-            if ($pscmdlet.ShouldProcess("Item: $registryPath Property: $registryName", 'Remove Property')) {
-                Remove-ItemProperty -Path $registryPath -Name $registryName -ErrorAction Stop
+            if ($pscmdlet.ShouldProcess(('Item: {0} Property: {1}' -f $registryPath,$registryName),'Remove Property')) {
+                Remove-ItemProperty -Path $registryPath -Name $registryName
             }
         }
     }
@@ -103,7 +110,8 @@ begin {
         [CmdletBinding()]
         param (
             [Parameter(Mandatory=$true)]
-            [string]$registryPath
+            [string]
+            $registryPath
         )
         if (-NOT(Test-Path -Path $registryPath -PathType Container)) {
             New-Item -Path $registryPath -ItemType RegistryKey -Force | Out-String | Write-Verbose
@@ -121,9 +129,9 @@ begin {
             [AllowNull()]
             [string]$String,
             [Parameter(ParameterSetName='String')]
-            [Switch]$Expand,
+            [switch]$Expand,
             [Parameter(Mandatory=$true,ParameterSetName='Binary')]
-            [byte[]]$Binary,
+            [string]$Binary,
             [Parameter(Mandatory=$true,ParameterSetName='DWord')]
             [int]$DWord,
             [Parameter(Mandatory=$true,ParameterSetName='DWordAsUnsignedInt')]
@@ -134,31 +142,42 @@ begin {
             [uint64]$UQWord,
             [Parameter(Mandatory=$true,ParameterSetName='MultiString')]
             [string[]]$Strings,
-            [Switch]$Force
+            [switch]$Force
         )
-        $value = switch ($pscmdlet.ParameterSetName) {
-            'String' { if ($Expand) { $type = 'ExpandString' } $String }
-            'Binary' { $Binary }
-            'DWord' { $DWord }
-            'QWord' { $QWord }
-            'DWordAsUnsignedInt' { $type = 'DWord'; $UDWord }
-            'QWordAsUnsignedInt' { $type = 'QWord'; $UQWord }
-            'MultiString' { $Strings }
+        $value = $null
+        $type = $pscmdlet.ParameterSetName
+        switch -Exact ($pscmdlet.ParameterSetName) {
+            'String' { 
+                $value = $String 
+                if ($Expand) {
+                    $type = 'ExpandString'
+                }
+            }
+            'Binary' { [byte[]]$value = $Binary.Split(',') | ForEach-Object { "0x$_"} }
+            'DWord' { $value = $DWord }
+            'QWord' { $value = $QWord }
+            'DWordAsUnsignedInt' { 
+                $value = $UDWord 
+                $type = 'DWord'
+            }
+            'QWordAsUnsignedInt' { 
+                $value = $UQWord 
+                $type = 'QWord'
+            }
+            'MultiString' { $value = $Strings }
         }
-
         Install-RegistryKey -registryPath $registryPath
-
         if ($Force) {
             Remove-RegistryKeyValue -registryPath $registryPath -registryName $registryName
         }
-
         if (Test-RegistryKeyValue -registryPath $registryPath -registryName $registryName) {
             $currentValue = Get-RegistryKeyValue -registryPath $registryPath -registryName $registryName
             if ($currentValue -ne $value) {
                 Set-ItemProperty -Path $registryPath -Name $registryName -Value $value
             }
-        } else {
-            New-ItemProperty -Path $registryPath -Name $registryName -Value $value -PropertyType $type | Out-Null
+        }
+        else {
+            $null = New-ItemProperty -Path $registryPath -Name $registryName -Value $value -PropertyType $type
         }
     }
     function Invoke-RegistryComplianceCheck() {
@@ -171,8 +190,13 @@ begin {
             [string]$registryExpectedValue,
             [Parameter(Mandatory=$true)]
             [string]$registryExpectedType
-        )
-        $getValue = Get-RegistryKeyValue -registryPath $registryPath -registryName $registryName
+            )
+        if ($registryExpectedType -eq "Binary") {
+            $getValue = Get-RegistryKeyValue -registryPath $registryPath -registryName $registryName -registryType $registryExpectedType
+        }
+        else {
+            $getValue = Get-RegistryKeyValue -registryPath $registryPath -registryName $registryName
+        }
         if (($getValue -ne $registryExpectedValue) -or ($null -eq $getValue)) {
             if ($null -eq $getValue) { $getValue = "null. (key does not exist)" }
             if ($runDetection -eq $true) { $global:needsRemediation += $true }
@@ -181,8 +205,10 @@ begin {
                 Write-Output "[INFO] runRemediation is set to $runRemediation. Remediation for $registryPath\$registryName will run."
                 try {
                     switch ($registryExpectedType) {
-                        "Dword" { Set-RegistryKeyValue -registryPath $registryPath -registryName $registryName -DWord $registryExpectedValue -Force -ErrorAction Stop }
+                        "String" { Set-RegistryKeyValue -registryPath $registryPath -registryName $registryName -String $registryExpectedValue -Force -ErrorAction Stop }
                         "Binary" { Set-RegistryKeyValue -registryPath $registryPath -registryName $registryName -Binary $registryExpectedValue -Force -ErrorAction Stop }
+                        "Dword" { Set-RegistryKeyValue -registryPath $registryPath -registryName $registryName -DWord $registryExpectedValue -Force -ErrorAction Stop }
+                        "MultiString" { Set-RegistryKeyValue -registryPath $registryPath -registryName $registryName -Strings $registryExpectedValue -Force -ErrorAction Stop }
                         default { throw "Unsupported registry type: $registryExpectedType" }
                     }
                     $getValue = Get-RegistryKeyValue -registryPath $registryPath -registryName $registryName
@@ -201,8 +227,6 @@ begin {
             $global:needsRemediation += $false
         }
     }
-    #endregion
-    #region Functions to get logged on user and account SID
     function Get-LoggedOnUser() {
         try {
             $loggedOnUser = (Get-Process -Name explorer -IncludeUserName | Select-Object UserName -Unique).UserName
