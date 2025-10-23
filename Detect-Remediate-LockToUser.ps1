@@ -71,7 +71,6 @@
     Author: Martin Bengtsson
     Blog: www.imab.dk
     Twitter: @mwbengtsson
-    Modified by: MAB (Kromann Reumert)
     
     Version History:
     3.0 - Added comprehensive detection for all required accounts (not just users)
@@ -418,7 +417,7 @@ process {
     # This script is configured for: MEM\KM_<USERNAME>_$
     # Where:
     #   - MEM = NetBIOS domain name for MEM service accounts
-    #   - KM_ = Prefix for the organization (Kromann Reumert)
+    #   - KM_ = Prefix for the organization
     #   - <USERNAME> = The logged-on user's username in UPPERCASE
     #   - _$ = Suffix with dollar sign (common for service accounts)
     # 
