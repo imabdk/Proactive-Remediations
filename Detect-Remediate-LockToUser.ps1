@@ -1,24 +1,40 @@
 <#
 .SYNOPSIS
-    Detects if the current user is added to the security policy: SeInteractiveLogonRight. 
-    If the user is not added the script will add the user to the Allow logon locally' security policy.  
-    The script is designed to be run as a detection and remediation script in Microsoft Intune.   
+    Restricts local logon rights (SeInteractiveLogonRight) to only authorized accounts on the device.
+    Ensures that only the device owner, local administrators, and necessary service accounts can log on locally.
+    Designed for Microsoft Intune deployment as a detection and remediation script.
     
 .DESCRIPTION
-    This script manages the SeInteractiveLogonRight security policy to ensure currently logged-on users
-    have permission to log on locally. It can run in detection-only mode or perform automatic remediation.
+    This script enforces device security by restricting the "Allow log on locally" security policy 
+    (SeInteractiveLogonRight) to a controlled list of authorized accounts. This prevents unauthorized 
+    users from logging on to devices that don't belong to them.
+    
+    The script locks down the device by allowing ONLY the following accounts to log on locally:
+    - Built-in Administrators group (S-1-5-32-544)
+    - The currently logged-on user (device owner)
+    - A trusted administrative group (configurable)
+    - WSI service account (if enabled)
+    - MEM service accounts for device management (if enabled)
+    
+    Any other accounts are explicitly denied local logon rights, ensuring devices remain locked 
+    to their assigned users.
     
     Version 3.0 adds comprehensive account validation and dynamic MEM service account support.
     
-    The script:
+    The script operates in two phases:
+    
+    DETECTION PHASE:
     1. Identifies currently logged-on users
-    2. Checks if they have SeInteractiveLogonRight permission
-    3. Validates that trusted groups and service accounts are also configured
-    4. Dynamically includes MEM service accounts based on logged-on users
-    5. Optionally adds missing users and accounts to the security policy
-    6. Maintains existing permissions for built-in groups
-    7. Validates configurations before applying changes
-    8. Includes retry logic for failed operations
+    2. Verifies all required accounts have SeInteractiveLogonRight permission
+    3. Reports compliance status for each account
+    4. Exits with code 1 if any required account is missing (triggers remediation in Intune)
+    
+    REMEDIATION PHASE (if enabled):
+    1. Rebuilds the SeInteractiveLogonRight policy with ONLY authorized accounts
+    2. Removes any unauthorized accounts that may have been added
+    3. Validates configuration before applying
+    4. Uses retry logic for reliability
+    5. Exits with code 0 on success
 
 .PARAMETER runDetection
     Whether to run the detection phase. Cannot be set to false as detection is required.
@@ -97,7 +113,7 @@
 .LINK
     https://www.imab.dk/configure-allow-logon-locally-automatically-using-powershell-and-microsoft-intune/
     
-#> 
+#>
 [CmdletBinding()]
 param (
     [parameter(Mandatory=$false, HelpMessage="Whether to run the detection phase. Cannot be disabled.")]
@@ -592,3 +608,4 @@ end {
         }
     }
 }
+
