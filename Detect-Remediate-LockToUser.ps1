@@ -30,7 +30,8 @@
 
 .PARAMETER trustedGroup
     The trusted group to include in the security policy. 
-    Default: "DOMAIN\TRUSTED GROUP"
+    IMPORTANT: This should be changed to match your organization's trusted admin group.
+    Default: "DOMAIN\Trusted Group"
 
 .PARAMETER includeWSIAccount
     Whether to include the WSI account in the security policy.
@@ -44,6 +45,8 @@
 .PARAMETER includeMEMAccount
     Whether to include MEM service accounts based on logged-on users.
     The account will be dynamically constructed as MEM\KM_<USERNAME>_$
+    IMPORTANT: The NetBIOS domain portion (MEM\KM_) must be manually changed in the script
+    if your organization uses a different naming convention for MEM service accounts.
     Default: $true
 
 .EXAMPLE
@@ -78,6 +81,8 @@
         - Remediation adds all required accounts in a single operation
         - Enhanced parameter documentation
         - Added new parameter: includeMEMAccount
+        - Fixed comparison logic to handle both SID format and account name format
+        - NOTE: MEM account NetBIOS domain (MEM\KM_) must be manually configured in script
     2.0 - Enhanced error handling for secedit operations
         - Added retry logic for failed secedit operations
         - Improved WSI account handling using SID format
@@ -102,11 +107,11 @@ param (
     
     [parameter(Mandatory=$false, HelpMessage="Whether to run the remediation phase if issues are detected.")]
     [ValidateNotNullOrEmpty()]
-    [bool]$runRemediation = $true,
+    [bool]$runRemediation = $false,
     
-    [parameter(Mandatory=$false, HelpMessage="The trusted group to include in the security policy.")]
+    [parameter(Mandatory=$false, HelpMessage="The trusted group to include in the security policy. Change to match your organization.")]
     [ValidateNotNullOrEmpty()]
-    [string]$trustedGroup = "DOMAIN\Trusted Group",
+    [string]$trustedGroup = "DOMAIN\Trusted Group",  # CUSTOMIZE: Change to your organization's trusted admin group
     
     [parameter(Mandatory=$false, HelpMessage="Whether to include the WSI account in the security policy.")]
     [bool]$includeWSIAccount = $true,
@@ -381,6 +386,15 @@ process {
     $global:remediationSuccess = @()
     $loggedonUserSID = @()
     $loggedOnUsers = Get-LoggedOnUsers
+    
+    # Get trusted group SID
+    # IMPORTANT CONFIGURATION NOTE:
+    # The trusted group is organization-specific and should be changed to match your environment.
+    # Examples for other organizations:
+    #   - "DOMAIN\IT Administrators"
+    #   - "CORP\Desktop Admins"
+    #   - "AD\Workstation Admins"
+    # Change the default value in the parameter section above to customize.
     $trustedGroupSID = Get-AccountSID -commonName $trustedGroup
     
     # Get WSI account SID if enabled
@@ -399,12 +413,28 @@ process {
     }
     
     # Get MEM service account SIDs if enabled (one per logged-on user)
+    # IMPORTANT CONFIGURATION NOTE:
+    # The MEM service account naming convention is organization-specific.
+    # This script is configured for: MEM\KM_<USERNAME>_$
+    # Where:
+    #   - MEM = NetBIOS domain name for MEM service accounts
+    #   - KM_ = Prefix for the organization (Kromann Reumert)
+    #   - <USERNAME> = The logged-on user's username in UPPERCASE
+    #   - _$ = Suffix with dollar sign (common for service accounts)
+    # 
+    # TO CUSTOMIZE: Change the line below to match your organization's naming convention:
+    #   $memAccountFullName = "MEM\KM_$($username)_`$"
+    # Example for different organizations:
+    #   $memAccountFullName = "DOMAIN\SVC_$($username)"
+    #   $memAccountFullName = "AD\$($username)_SERVICE`$"
+    
     $memAccountSIDs = @()
     if ($includeMEMAccount -and -NOT[string]::IsNullOrEmpty($loggedOnUsers)) {
         foreach ($loggedOnUser in $loggedOnUsers) {
             # Extract username from domain\username format
             if ($loggedOnUser -match '\\(.+)$') {
                 $username = $matches[1].ToUpper()
+                # CUSTOMIZE THIS LINE for your organization's MEM account naming convention
                 $memAccountFullName = "MEM\KM_$($username)_`$"
                 Write-Verbose "Attempting to get SID for MEM service account: $memAccountFullName"
                 try {
