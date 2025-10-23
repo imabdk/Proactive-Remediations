@@ -30,7 +30,7 @@
 
 .PARAMETER trustedGroup
     The trusted group to include in the security policy. 
-    Default: "KM\Client Computer Admins"
+    Default: "DOMAIN\TRUSTED GROUP"
 
 .PARAMETER includeWSIAccount
     Whether to include the WSI account in the security policy.
@@ -102,7 +102,7 @@ param (
     
     [parameter(Mandatory=$false, HelpMessage="Whether to run the remediation phase if issues are detected.")]
     [ValidateNotNullOrEmpty()]
-    [bool]$runRemediation = $false,
+    [bool]$runRemediation = $true,
     
     [parameter(Mandatory=$false, HelpMessage="The trusted group to include in the security policy.")]
     [ValidateNotNullOrEmpty()]
@@ -420,7 +420,15 @@ process {
     if (-NOT[string]::IsNullOrEmpty($loggedOnUsers)) {
         if ($runDetection -eq $true) {
             $currentConfig = Get-SeInterActiveLogonRightConfig
-            $trimCurrentConfig = $currentConfig -split "," | ForEach-Object { $_ -replace "SeInteractiveLogonRight = " }
+            $trimCurrentConfig = $currentConfig -split "," | ForEach-Object { ($_ -replace "SeInteractiveLogonRight = ", "").Trim() }
+            
+            Write-Verbose "Raw current configuration: $currentConfig"
+            Write-Verbose "Current configured SIDs (count: $($trimCurrentConfig.Count)): $($trimCurrentConfig -join ' | ')"
+            Write-Verbose "Each configured SID:"
+            foreach ($sid in $trimCurrentConfig) {
+                Write-Verbose "  - '$sid' (Length: $($sid.Length))"
+            }
+            
             foreach ($loggedOnUser in $loggedOnUsers) {
                 $loggedonUserSID += Get-AccountSID -commonName $loggedOnUser
             }
@@ -428,6 +436,7 @@ process {
             # Check logged-on users
             foreach ($userSID in $loggedonUserSID) {
                 $sidWithPrefix = "*$($userSID)"
+                Write-Verbose "Checking if '$sidWithPrefix' is in configuration"
                 if ($trimCurrentConfig -notcontains $sidWithPrefix) {
                     Write-Output "[WARNING] the user's SID: $userSID is NOT added to the security policy: SeInteractiveLogonRight"  
                     $global:needsRemediation += $true
@@ -441,6 +450,7 @@ process {
             # Check trusted group
             if ($trustedGroupSID) {
                 $sidWithPrefix = "*$($trustedGroupSID.Value)"
+                Write-Verbose "Checking if trusted group '$sidWithPrefix' is in configuration"
                 if ($trimCurrentConfig -notcontains $sidWithPrefix) {
                     Write-Output "[WARNING] Trusted group SID: $($trustedGroupSID.Value) ($trustedGroup) is NOT added to the security policy: SeInteractiveLogonRight"
                     $global:needsRemediation += $true
@@ -454,12 +464,21 @@ process {
             # Check WSI account
             if ($includeWSIAccount -and $wsiAccountSID) {
                 $sidWithPrefix = "*$($wsiAccountSID.Value)"
-                if ($trimCurrentConfig -notcontains $sidWithPrefix) {
+                $accountNameAlternative = $wsiAccountName
+                
+                Write-Verbose "Checking if WSI account '$sidWithPrefix' or account name '$accountNameAlternative' is in configuration"
+                
+                # Check if either the SID format or the account name is present
+                if (($trimCurrentConfig -notcontains $sidWithPrefix) -and ($trimCurrentConfig -notcontains $accountNameAlternative)) {
                     Write-Output "[WARNING] WSI account SID: $($wsiAccountSID.Value) is NOT added to the security policy: SeInteractiveLogonRight"
                     $global:needsRemediation += $true
                 }
                 else {
-                    Write-Output "[OK] WSI account SID: $($wsiAccountSID.Value) is already added to the security policy: SeInteractiveLogonRight"
+                    if ($trimCurrentConfig -contains $sidWithPrefix) {
+                        Write-Output "[OK] WSI account SID: $($wsiAccountSID.Value) is already added to the security policy: SeInteractiveLogonRight (as SID)"
+                    } else {
+                        Write-Output "[OK] WSI account is already added to the security policy: SeInteractiveLogonRight (as account name: $accountNameAlternative)"
+                    }
                     $global:needsRemediation += $false
                 }
             }
@@ -468,6 +487,7 @@ process {
             if ($includeMEMAccount -and $memAccountSIDs.Count -gt 0) {
                 foreach ($memSID in $memAccountSIDs) {
                     $sidWithPrefix = "*$($memSID.Value)"
+                    Write-Verbose "Checking if MEM account '$sidWithPrefix' is in configuration"
                     if ($trimCurrentConfig -notcontains $sidWithPrefix) {
                         Write-Output "[WARNING] MEM service account SID: $($memSID.Value) is NOT added to the security policy: SeInteractiveLogonRight"
                         $global:needsRemediation += $true
