@@ -410,7 +410,15 @@ process {
     #   - "CORP\Desktop Admins"
     #   - "AD\Workstation Admins"
     # Change the default value in the parameter section above to customize.
-    $trustedGroupSID = Get-AccountSID -commonName $trustedGroup
+    $trustedGroupSID = $null
+    try {
+        $trustedGroupSID = Get-AccountSID -commonName $trustedGroup
+        Write-Verbose "Trusted group SID: $trustedGroupSID"
+    } catch {
+        Write-Warning "Failed to get SID for trusted group '$trustedGroup': $_."
+        Write-Warning "Trusted group will be skipped. Please verify the group name is correct."
+        $trustedGroupSID = $null
+    }
     
     # Get WSI account SID if enabled
     $wsiAccountSID = $null
@@ -608,4 +616,3 @@ end {
         }
     }
 }
-
